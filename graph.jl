@@ -49,15 +49,14 @@ end
 
 @time chkins = user_venue_checkins(checkins)
 
-gg = empty_graph()
+gg = empty_graph(1)
 
 @time for row in eachrow(network)
     add_edge!(gg, row)
 end
 
-@time for num in nodes_iter(gg)
-    i = getname(gg, num)
-    gg.node_attr[num] = chkins[i]
+@time for name in names_iter(gg)
+    gg.node[name] = chkins[name]
 end
 
 a = open("/Users/georgeberry/Desktop/save.thing", "w+")
@@ -66,70 +65,70 @@ a = open("/Users/georgeberry/Desktop/save.thing", "w+")
 
 ##### ego analysis
 
-g = open("/Users/georgeberry/Desktop/save.thing", "r") do file
+@time g = open("/Users/georgeberry/Desktop/save.thing", "r") do file
     deserialize(file)
 end
 
 #types
-type Exposure
-    size::Int64
-    config::Dict{Str, Config}
-end
-
 type Config
     adopt::Int64
     exp::Int64
 end
 
+#function add_up(c1::Exposure, c2::Exposure)
+#    c3 = Exposure()
+
 
 ##functions
 
 function ego_analysis(ego_subgraph::Graph)
-    ego_info = Dict{Int, Dict()}()
+    ego_info = Dict()
 
-    ego_subgraph.node_attr[1] = first_checkins(ego_subgraph.node_attr[1])
+    ego_name = get_names(ego_subgraph, 1)
+
+    ego_subgraph.node[ego_name] = first_checkins(ego_subgraph.node[ego_name])
 
     all_venues = Set{Int64}()
-    for nodes in nodes_iter(ego_subgraph)
-        union(all_venues, keys(ego_subgraph.node_attr[node]))
+    for nodes in names_iter(ego_subgraph)
+        union!(all_venues, keys(ego_subgraph.node[nodes]))
     end
     #would like to get all venues up front
 
     for venue in all_venues
 
-        ego_visited = 0
-
-        if venue in ego_subgraph.node_attr[1]
+        if haskey(ego_subgraph.node[ego_name], venue)
             ego_visited = 1
+            first_checkin = ego_subgraph.node[ego_name][venue][1]
+        else
+            ego_visited = 0
+            first_checkin = Date(2014,1,1,1,1,1) #after the dataset
         end
 
-        prev_alters = prev_alter_checkins(ego_subgraph, venue, ego_subgraph.node_attr[venue][1]) ##need to pass the last argument a really big date if the ego hasn't checked in
+        prev_alters = prev_alter_checkins(ego_subgraph, venue, first_checkin) ##need to pass the last argument a really big date if the ego hasn't checked in
 
-
-
-        for alters in range(len(prev_alters))
+        for alters in 1:length(prev_alters)
             #may need to fix indexing here
-            exposure_group = append!([prev_alters[x][1] for x in range(alters)], 1)
+            exposure_group = push!([prev_alters[x][1] for x in 1:alters], ego_name)
             ego_venue_subgraph = subgraph(ego_subgraph, exposure_group)
-            exposure_size = ego_venue_subgraph.num_nodes - 1
+            exposure_size = ego_venue_subgraph.size - 1
 
             if exposure_size >= 1 && exposure_size <= 5
                 config = get_config(ego_venue_subgraph)
                 if haskey(ego_info, exposure_size) == false
-                    ego_info[exposure_size] = Exposure(exposure_size, Dict{Str, Config}())
+                    ego_info[exposure_size] = Dict()
                 end
 
-                if haskey(ego_info[exposure_size].config, config) == false
-                    ego_info[exposure_size].config[config] = Config(0, 0)
+                if haskey(ego_info[exposure_size], config) == false
+                    ego_info[exposure_size][config] = [0,0]
                 end
 
+                ego_info[exposure_size][config][2] += 1
             end
 
-            ego_info[exposure_size].config[config].exp += 1
 
-            if ego_visited == 1
+            if ego_visited == 1 && exposure_size <= 5
                 if (alters) == length(prev_alters)
-                    ego_info[exposure_size].config[config].adopt += 1
+                    ego_info[exposure_size][config][1] += 1
                 end
             end
         end
@@ -138,22 +137,32 @@ function ego_analysis(ego_subgraph::Graph)
 end
 
 
-function first_checkins(checkins::Dict)
+function first_checkins(venue_dict::Dict)
+    checkin_dict = Dict()
+
+    for venue in keys(venue_dict)
+        checkin_dict[venue] = [venue_dict[venue][1]]
+    end
+
+    return checkin_dict
 
 end
 
 function prev_alter_checkins(ego_subgraph::Graph, venue::Int64, date_cutoff::Date)
     prev_alters = Tuple[]
 
-    for alter in nodes_iter(ego_subgraph)
-        if venue in ego_subgraph.node_attr[alter]
-            for checkin in ego_subgraph.node_attr[alter][venue]
+    count = 0
+
+    for alter in names_iter(ego_subgraph)
+        if haskey(ego_subgraph.node[alter], venue)
+            for checkin in ego_subgraph.node[alter][venue]
                 if greater_than(checkin, date_cutoff)
                     break
                 elseif greater_than(date_cutoff, checkin)
                     push!(prev_alters, (alter, checkin))
                     break
                 end
+            end
             count += 1
         end
 
@@ -168,16 +177,13 @@ function prev_alter_checkins(ego_subgraph::Graph, venue::Int64, date_cutoff::Dat
 end
 
 
-
-end
-
 function get_config(ego_venue_subgraph::Graph)
-    goodbye_ego = remove_node(ego_venue_subgraph, 1)
+    goodbye_ego = remove_node(ego_venue_subgraph, get_names(ego_venue_subgraph, 1))
 
-    config = [str(x) for x in sort(degree(ego_venue_subgraph))]
-    config = join(config, '')
-    
-
+    config = [string(x) for x in sort(degree(ego_venue_subgraph))]
+    config = join(config, "")
+    config = join((config, length(connected_components(ego_venue_subgraph))), ":")
+    return config
 end
 
 function lt_date_tuple(date_tuple1::Tuple, date_tuple2::Tuple)
@@ -188,3 +194,22 @@ function lt_date_tuple(date_tuple1::Tuple, date_tuple2::Tuple)
     end
 end
 
+answers = Dict()
+
+@time for vertex in names_iter(g)
+    x = ego_analysis(ego_subgraph(g, vertex))
+    for size in keys(x)
+        if haskey(answers, size) == false
+            answers[size] = Dict()
+        end
+
+        for c in keys(x[size])
+            if haskey(answers[size], c) == false
+                answers[size][c] = [0,0]
+            end
+
+            answers[size][c][1] += x[size][c][1]
+            answers[size][c][2] += x[size][c][2] 
+        end
+    end
+end

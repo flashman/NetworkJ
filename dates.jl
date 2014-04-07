@@ -1,6 +1,7 @@
-Module Dates
+module Dates
 
-export Date, greater_than, date_sort
+export Date, greater_than, less_than, date_sort
+end
 
 type Date
     year::Int64

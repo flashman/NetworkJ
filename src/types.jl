@@ -35,7 +35,7 @@ index_iter(g::Graph) = 1:g.size
 
 names_iter(g::Graph) = keys(g.names_to_int)
 
-print_names(g::Graph) = [x for x in keys(g.names_to_int)]
+name_list(g::Graph) = [x for x in keys(g.names_to_int)]
 
 num_edges(g::Graph) = sum(degree(g))/2
 

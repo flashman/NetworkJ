@@ -1,4 +1,7 @@
-function range_targ{T}(g::Graph{T}, source::Int64, target::Int64)
+##functions range_target, tie_range mostly written by Chris Cameron (github: @chrisjcameron)
+##used with permission
+
+function range_target{T}(g::Graph{T}, source::Int64, target::Int64)
 
     visited = BitVector(g.size)
 
@@ -29,7 +32,7 @@ function range_targ{T}(g::Graph{T}, source::Int64, target::Int64)
         node_queue = next_node_queue
         tie_len += 1
     end
-    return - 1
+    return -1
 end
 
 
@@ -41,49 +44,12 @@ function tie_range{T}(g::Graph{T}) #for undirected
         e1, e2 = edges[edge_num]
         if e1 < e2
             remove_edge!(g, edges[edge_num])
-            ranges[edge_num] = range_targ(g, e1, e2)
+            ranges[edge_num] = range_target(g, e1, e2)
             add_edge!(g, (get_name(g, e1), get_name(g,e2)))
         end
     end
     return edges, ranges
 end
-
-function bfs(adj::Array{Set{Int64}}, node_index::Int64)
-    seen = Set{Int64}()
-    to_traverse = Int64[]
-
-    push!(to_traverse, node_index)
-    push!(seen, node_index)
-
-    while length(to_traverse) > 0
-        t = pop!(to_traverse)
-
-        for vertex in adj[t]
-            if in(vertex, seen) == false
-                push!(to_traverse, vertex)
-                push!(seen, vertex)
-            end
-        end
-    end
-    return seen
-end
-
-
-#number of connectex components in a graph
-function connected_components(g::Graph)
-    seen_set = Set{Int64}()
-    components = Set{Int64}[]
-
-    for vertex in index_iter(g)
-        if in(vertex, seen_set) == false
-            c = bfs(g.adj, vertex)
-            push!(components, c)
-            union!(seen_set, c)
-        end
-    end
-    return sort(components, by = x -> length(x), rev = true)
-end
-
 
 ##path length algorithms
 

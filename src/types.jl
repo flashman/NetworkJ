@@ -37,6 +37,8 @@ names_iter(g::Graph) = keys(g.names_to_int)
 
 name_list(g::Graph) = [x for x in keys(g.names_to_int)]
 
+index_list(g::Graph) = [x for x in 1:g.size]
+
 num_edges(g::Graph) = sum(degree(g))/2
 
 neighbors{T}(g::Graph{T}, node_index) = g.adj[node_index]
@@ -57,28 +59,30 @@ end
 
 #add edges by node names, not indicies
 function add_edge!{T}(g::Graph{T}, edge::(T,T))
-    e1, e2 = edge[1], edge[2]
+    e1n::T, e2n::T = edge[1], edge[2]
 
-    if haskey(g.names_to_int, e1) == false
+    if haskey(g.names_to_int, e1n) == false
         g.size += 1
-        g.names_to_int[e1] = g.size
-        g.int_to_names[g.size] = e1
+        g.names_to_int[e1n] = g.size
+        g.int_to_names[g.size] = e1n
         push!(g.adj, Set{Int64}())
     end
 
-    if haskey(g.names_to_int, e2) == false
+    if haskey(g.names_to_int, e2n) == false
         g.size += 1
-        g.names_to_int[e2] = g.size
-        g.int_to_names[g.size] = e2
+        g.names_to_int[e2n] = g.size
+        g.int_to_names[g.size] = e2n
         push!(g.adj, Set{Int64}())
     end
 
-    i1 = get_index(g, e1)
-    i2 = get_index(g, e2)
+    add_edge_index!(g, get_index(g, e1n), get_index(g, e2n))
+end
 
-    push!(g.adj[i1], i2)
-
-    push!(g.adj[i2], i1)
+#if you know the nodes are there, just push the edges
+#fast and low level
+function add_edge_index!{T}(g::Graph{T}, e1::Int64, e2::Int64)
+    push!(g.adj[e1], e2)
+    push!(g.adj[e2], e1)
 end
 
 #give this the node name
@@ -146,8 +150,8 @@ function remove_node!{T}(g::Graph{T}, node::T)
 end
 
 function remove_edge!{T}(g::Graph{T}, edge::(Int64, Int64))
-    e1 = edge[1]
-    e2 = edge[2]
+    e1::Int64 = edge[1]
+    e2::Int64 = edge[2]
 
     delete!(g.adj[e1], e2)
     delete!(g.adj[e2], e1)
